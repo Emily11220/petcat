@@ -52,8 +52,9 @@ p {
     user-select: none;
 }
 
+/* Ensure the GIF is styled the same as the image */
 #cat-gif {
-    display: none;
+    display: none; /* Initially hide the GIF */
     pointer-events: none; /* Prevent any interaction with the GIF */
 }
 
