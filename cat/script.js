@@ -1,18 +1,13 @@
 const catGif = document.getElementById('cat-gif');
-const catImage = document.getElementById('cat-image');
+const catimage = document.getElementById('cat-image');
 const hand = document.getElementById('hand');
 let isDragging = false;
 let lastX = 0;
 let petCount = 0;
+let isPetting = false;
 let movements = [];
-let animationFrame;
 
-// Preload the GIF
-const preloadGif = () => {
-    const img = new Image();
-    img.src = catGif.src;
-};
-
+// Initial hand position
 function setInitialHandPosition() {
     const x = window.innerWidth / 2;
     const y = window.innerHeight / 2;
@@ -20,36 +15,26 @@ function setInitialHandPosition() {
 }
 
 function updateHandPosition(x, y) {
-    // Ensure coordinates stay within viewport bounds
-    x = Math.max(0, Math.min(x, window.innerWidth));
-    y = Math.max(0, Math.min(y, window.innerHeight));
-    
     hand.style.left = `${x}px`;
     hand.style.top = `${y}px`;
     hand.style.transform = 'translate(-50%, -50%)';
 }
 
+// Start GIF and hide the placeholder
 function startGif() {
-    // Ensure elements exist before manipulating
-    if (catGif && catImage) {
-        catGif.style.display = 'block';
-        catImage.style.display = 'none';
-        
-        // Force browser to recognize the change
-        catGif.offsetHeight;
-    }
+    catGif.style.display = 'block';
+    catimage.style.display = 'none';
+    isPetting = true;
 }
 
+// Stop GIF and show the placeholder (only when dragging ends)
 function stopGif() {
-    if (catGif && catImage) {
-        catGif.style.display = 'none';
-        catImage.style.display = 'block';
-        
-        // Force browser to recognize the change
-        catImage.offsetHeight;
-    }
+    catGif.style.display = 'none';
+    catimage.style.display = 'block';
+    isPetting = false;
 }
 
+// Improved motion detection
 function detectPettingMotion(currentX) {
     movements.push(currentX);
     if (movements.length > 5) {
@@ -59,12 +44,11 @@ function detectPettingMotion(currentX) {
     if (movements.length >= 3) {
         let hasLeftMove = false;
         let hasRightMove = false;
-        let threshold = 5; // Reduced threshold for more sensitive detection
         
         for (let i = 1; i < movements.length; i++) {
             const diff = movements[i] - movements[i-1];
-            if (diff > threshold) hasRightMove = true;
-            if (diff < -threshold) hasLeftMove = true;
+            if (diff > 10) hasRightMove = true;
+            if (diff < -10) hasLeftMove = true;
         }
         
         return hasLeftMove && hasRightMove;
@@ -72,16 +56,14 @@ function detectPettingMotion(currentX) {
     return false;
 }
 
+// Handle both mouse and touch events
 function handleStart(e) {
     isDragging = true;
     const point = e.touches ? e.touches[0] : e;
     lastX = point.clientX;
     movements = [lastX];
     hand.style.transform = 'translate(-50%, -50%) scale(1.1)';
-    
-    // Ensure we're showing the placeholder initially
-    catGif.style.display = 'none';
-    catImage.style.display = 'block';
+    catimage.style.display = 'none'; // Hide placeholder when dragging starts
 }
 
 function handleMove(e) {
@@ -90,89 +72,71 @@ function handleMove(e) {
     
     const point = e.touches ? e.touches[0] : e;
     const currentX = point.clientX;
-    const currentY = point.clientY;
     
-    // Cancel any existing animation frame
-    if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
+    updateHandPosition(currentX, point.clientY);
+    
+    // Check if hand is in pet zone
+    const handRect = hand.getBoundingClientRect();
+    const petZone = document.querySelector('.pet-zone').getBoundingClientRect();
+    
+    if (handRect.top >= petZone.top && handRect.bottom <= petZone.bottom) {
+        if (detectPettingMotion(currentX)) {
+            petCount++;
+            if (petCount > 1) { // Reduced threshold for easier triggering on mobile
+                startGif();
+            }
+        }
+    } else {
+        petCount = 0;
     }
     
-    // Use requestAnimationFrame for smooth updates
-    animationFrame = requestAnimationFrame(() => {
-        updateHandPosition(currentX, currentY);
-        
-        // Check if hand is in pet zone
-        const handRect = hand.getBoundingClientRect();
-        const petZone = document.querySelector('.pet-zone').getBoundingClientRect();
-        
-        if (handRect.top >= petZone.top && handRect.bottom <= petZone.bottom) {
-            if (detectPettingMotion(currentX)) {
-                petCount++;
-                if (petCount > 1) {
-                    startGif();
-                }
-            }
-        } else {
-            petCount = 0;
-            stopGif();
-        }
-        
-        lastX = currentX;
-    });
+    lastX = currentX;
 }
 
 function handleEnd() {
-    isDragging = false;
-    hand.style.transform = 'translate(-50%, -50%)';
-    stopGif();
-    
-    if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
+    if (isDragging) {
+        isDragging = false;
+        hand.style.transform = 'translate(-50%, -50%)';
+        stopGif(); // Only stop GIF when dragging ends
+        setTimeout(() => {
+            petCount = 0;
+            movements = [];
+        }, 300);
     }
-    
-    setTimeout(() => {
-        petCount = 0;
-        movements = [];
-    }, 300);
 }
 
-// Clean up event listeners on body and document
-function setupEventListeners() {
-    // Mouse events
-    hand.addEventListener('mousedown', handleStart);
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleEnd);
+// Mouse events
+hand.addEventListener('mousedown', handleStart);
+document.addEventListener('mousemove', handleMove);
+document.addEventListener('mouseup', handleEnd);
 
-    // Touch events with passive: false for better mobile handling
-    hand.addEventListener('touchstart', handleStart, { passive: false });
-    document.addEventListener('touchmove', handleMove, { passive: false });
-    document.addEventListener('touchend', handleEnd);
-    document.addEventListener('touchcancel', handleEnd);
+// Touch events
+hand.addEventListener('touchstart', handleStart, { passive: false });
+document.addEventListener('touchmove', handleMove, { passive: false });
+document.addEventListener('touchend', handleEnd);
+document.addEventListener('touchcancel', handleEnd);
 
-    // Prevent default drag behavior
-    hand.addEventListener('dragstart', (e) => e.preventDefault());
+// Prevent default drag behavior
+hand.addEventListener('dragstart', (e) => e.preventDefault());
 
-    // Handle window resize
-    window.addEventListener('resize', setInitialHandPosition);
-}
+// Handle window resize
+window.addEventListener('resize', setInitialHandPosition);
 
-// Initialize everything when the page loads
+// Initial setup
 window.addEventListener('load', () => {
-    preloadGif();
     setInitialHandPosition();
-    setupEventListeners();
     
-    // Prevent unwanted mobile behaviors
+    // Prevent default touch behaviors
     document.body.addEventListener('touchstart', (e) => {
         if (e.target === hand) {
             e.preventDefault();
         }
     }, { passive: false });
-    
-    // Disable page scrolling while dragging
-    document.body.addEventListener('touchmove', (e) => {
-        if (isDragging) {
-            e.preventDefault();
-        }
-    }, { passive: false });
 });
+
+// Prevent scrolling while dragging on mobile
+document.body.addEventListener('touchmove', (e) => {
+    if (isDragging) {
+        e.preventDefault();
+    }
+}, { passive: false });
