@@ -1,10 +1,9 @@
-const catGif = document.getElementById('cat-gif');
-const catimage = document.getElementById('cat-image');
+const catVideo = document.getElementById('cat-video');
+const catImage = document.getElementById('cat-image');
 const hand = document.getElementById('hand');
 let isDragging = false;
 let lastX = 0;
 let petCount = 0;
-let isPetting = false;
 let movements = [];
 
 // Initial hand position
@@ -20,21 +19,20 @@ function updateHandPosition(x, y) {
     hand.style.transform = 'translate(-50%, -50%)';
 }
 
-// Start GIF and hide the placeholder
-function startGif() {
-    catGif.style.display = 'block';
-    catimage.style.display = 'none';
-    isPetting = true;
+// Start and pause video
+function startVideo() {
+    catImage.style.display = 'none'; // Hide the cat image
+    catVideo.style.display = 'block'; // Show the video
+    catVideo.play(); // Play the video
 }
 
-// Stop GIF and show the placeholder (only when dragging ends)
-function stopGif() {
-    catGif.style.display = 'none';
-    catimage.style.display = 'block';
-    isPetting = false;
+function stopVideo() {
+    catVideo.pause(); // Pause the video
+    catVideo.style.display = 'none'; // Hide the video
+    catImage.style.display = 'block'; // Show the cat image again
 }
 
-// Improved motion detection
+// Detect left-right petting motion
 function detectPettingMotion(currentX) {
     movements.push(currentX);
     if (movements.length > 5) {
@@ -56,14 +54,13 @@ function detectPettingMotion(currentX) {
     return false;
 }
 
-// Handle both mouse and touch events
+// Handle start, move, and end of dragging
 function handleStart(e) {
     isDragging = true;
     const point = e.touches ? e.touches[0] : e;
     lastX = point.clientX;
     movements = [lastX];
     hand.style.transform = 'translate(-50%, -50%) scale(1.1)';
-    catimage.style.display = 'none'; // Hide placeholder when dragging starts
 }
 
 function handleMove(e) {
@@ -83,7 +80,7 @@ function handleMove(e) {
         if (detectPettingMotion(currentX)) {
             petCount++;
             if (petCount > 1) { // Reduced threshold for easier triggering on mobile
-                startGif();
+                startVideo();
             }
         }
     } else {
@@ -97,7 +94,7 @@ function handleEnd() {
     if (isDragging) {
         isDragging = false;
         hand.style.transform = 'translate(-50%, -50%)';
-        stopGif(); // Only stop GIF when dragging ends
+        stopVideo(); // Only stop video when dragging ends
         setTimeout(() => {
             petCount = 0;
             movements = [];
@@ -105,12 +102,11 @@ function handleEnd() {
     }
 }
 
-// Mouse events
+// Mouse and touch events
 hand.addEventListener('mousedown', handleStart);
 document.addEventListener('mousemove', handleMove);
 document.addEventListener('mouseup', handleEnd);
 
-// Touch events
 hand.addEventListener('touchstart', handleStart, { passive: false });
 document.addEventListener('touchmove', handleMove, { passive: false });
 document.addEventListener('touchend', handleEnd);
@@ -126,7 +122,6 @@ window.addEventListener('resize', setInitialHandPosition);
 window.addEventListener('load', () => {
     setInitialHandPosition();
     
-    // Prevent default touch behaviors
     document.body.addEventListener('touchstart', (e) => {
         if (e.target === hand) {
             e.preventDefault();
